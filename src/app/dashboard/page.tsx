@@ -87,7 +87,7 @@ export default function DashboardPage() {
 
         {/* Quick Actions */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {user.role === "donor" && (
+          {(user.role === "donor" || user.role === "volunteer") && (
             <div className="bg-white overflow-hidden shadow rounded-lg hover:shadow-md transition-shadow border border-gray-100">
               <div className="p-5">
                 <div className="flex items-center">
@@ -96,9 +96,9 @@ export default function DashboardPage() {
                   </div>
                   <div className="ml-5 w-0 flex-1">
                     <dl>
-                      <dt className="text-sm font-medium text-gray-500 truncate">Donate Food</dt>
+                      <dt className="text-sm font-medium text-gray-500 truncate">Post Item / Update</dt>
                       <dd>
-                        <div className="text-lg font-medium text-gray-900">Post extra food</div>
+                        <div className="text-lg font-medium text-gray-900">Post food or situation update</div>
                       </dd>
                     </dl>
                   </div>
@@ -143,7 +143,7 @@ export default function DashboardPage() {
         </div>
 
         {/* My Pickups (Cart) */}
-        {(user.role === "receiver" || user.role === "volunteer") && (
+        {user.role === "receiver" && (
           <section className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
             <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
               <QrCode className="w-6 h-6 text-primary" /> My Pickups

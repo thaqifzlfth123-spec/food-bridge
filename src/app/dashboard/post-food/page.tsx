@@ -41,8 +41,8 @@ export default function PostFoodPage() {
     }
   });
 
-  if (!user || user.role !== "donor") {
-    return <div className="p-8 text-center text-red-500">Access Denied. Donors only.</div>;
+  if (!user || (user.role !== "donor" && user.role !== "volunteer")) {
+    return <div className="p-8 text-center text-red-500">Access Denied. Donors and Volunteers only.</div>;
   }
 
   const onSubmit = async (data: PostFoodValues) => {
