@@ -5,6 +5,8 @@ export type User = {
   name: string;
   email: string;
   role: Role;
+  noShowCount?: number;
+  isVerified?: boolean;
 };
 
 export type UrgencyLevel = "Low" | "Medium" | "High" | "Critical" | "Expired";
@@ -35,14 +37,15 @@ export type Claim = {
   receiverId: string;
   quantity: number;
   pickupTime: string; // ISO String
-  status: "Pending" | "Approved" | "Rejected" | "Collected" | "Cancelled";
+  status: "Pending" | "Approved" | "Rejected" | "Collected" | "Cancelled" | "No-Show";
+  createdAt: string; // ISO String
 };
 
 // Initial Mock Data
 export const MOCK_USERS: User[] = [
-  { id: "u1", name: "Campus Cafe", email: "cafe@campus.edu", role: "donor" },
-  { id: "u2", name: "Aina", email: "aina@student.edu", role: "receiver" },
-  { id: "u3", name: "Sarah", email: "sarah@volunteer.org", role: "volunteer" },
+  { id: "u1", name: "Campus Cafe", email: "cafe@campus.edu", role: "donor", isVerified: true },
+  { id: "u2", name: "Aina", email: "aina@student.edu", role: "receiver", noShowCount: 0 },
+  { id: "u3", name: "Sarah", email: "sarah@volunteer.org", role: "volunteer", noShowCount: 0 },
   { id: "u4", name: "Admin John", email: "admin@campus.edu", role: "admin" },
 ];
 
@@ -92,6 +95,7 @@ export const MOCK_CLAIMS: Claim[] = [
     receiverId: "u2",
     quantity: 5,
     pickupTime: new Date(Date.now() + 1 * 60 * 60 * 1000).toISOString(),
-    status: "Approved"
+    status: "Approved",
+    createdAt: new Date().toISOString()
   }
 ];

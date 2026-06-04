@@ -1,9 +1,9 @@
 "use client";
 
 import { useAuth } from "@/lib/auth-context";
-import { MOCK_LISTINGS } from "@/lib/mock-data";
+import { MOCK_LISTINGS, MOCK_USERS } from "@/lib/mock-data";
 import { calculateUrgency } from "@/lib/urgency";
-import { Clock, MapPin, AlertCircle, ArrowLeft } from "lucide-react";
+import { Clock, MapPin, ArrowLeft, BadgeCheck } from "lucide-react";
 import Link from "next/link";
 
 export default function ListingsPage() {
@@ -39,6 +39,8 @@ export default function ListingsPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {MOCK_LISTINGS.map(listing => {
             const urgency = calculateUrgency(listing);
+            const donor = MOCK_USERS.find(u => u.id === listing.donorId);
+            
             return (
               <Link href={`/listings/${listing.id}`} key={listing.id} className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow overflow-hidden border border-gray-100 flex flex-col">
                 <div className="p-5 flex-1">
@@ -51,7 +53,13 @@ export default function ListingsPage() {
                     </span>
                   </div>
                   
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">{listing.foodName}</h3>
+                  <h3 className="text-xl font-bold text-gray-900 mb-1">{listing.foodName}</h3>
+                  {donor?.isVerified && (
+                    <div className="flex items-center text-xs text-blue-600 mb-3 font-medium">
+                      <BadgeCheck className="w-3.5 h-3.5 mr-1" /> Verified Donor
+                    </div>
+                  )}
+                  
                   <p className="text-gray-600 text-sm line-clamp-2 mb-4">{listing.description}</p>
                   
                   <div className="space-y-2 mt-auto">
