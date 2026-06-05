@@ -1,12 +1,13 @@
 "use client";
 
 import { useAuth } from "@/lib/auth-context";
-import { MOCK_LISTINGS, MOCK_USERS, MOCK_CLAIMS } from "@/lib/mock-data";
 import { calculateUrgency } from "@/lib/urgency";
-import { ArrowLeft, Clock, MapPin, ShieldAlert, CheckCircle2, BadgeCheck } from "lucide-react";
+import { ArrowLeft, Clock, MapPin, ShieldAlert, CheckCircle2, BadgeCheck, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { getListingById, createClaim, getUserById } from "@/app/actions";
+import { FoodListing, User } from "@/lib/mock-data";
 
 export default function FoodDetailPage() {
   const { id } = useParams();
@@ -16,54 +17,53 @@ export default function FoodDetailPage() {
   const [claimed, setClaimed] = useState(false);
   const [allergyChecked, setAllergyChecked] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [listing, setListing] = useState<FoodListing | null>(null);
+  const [donor, setDonor] = useState<User | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  const listing = MOCK_LISTINGS.find(l => l.id === id);
-  
-  if (!listing) {
-    return <div className="p-8 text-center text-gray-500">Listing not found</div>;
-  }
+  useEffect(() => {
+    getListingById(id as string).then(async data => {
+      setListing(data);
+      if (data) {
+        const d = await getUserById(data.donorId);
+        setDonor(d);
+      }
+      setLoading(false);
+    });
+  }, [id]);
 
-  const donor = MOCK_USERS.find(u => u.id === listing.donorId);
+  if (loading) return <div className="min-h-screen flex items-center justify-center">Loading details...</div>;
+  if (!listing) return <div className="p-8 text-center text-gray-500">Listing not found</div>;
+
   const urgency = calculateUrgency(listing);
+  const requiresAllergyCheck = Boolean(listing.allergies);
+  const canClaim = !requiresAllergyCheck || allergyChecked;
 
-  const handleClaim = () => {
+  const handleClaim = async () => {
     if (!user) {
       router.push("/login");
       return;
     }
 
-    // --- NO-SHOW PENALTY ---
-    if ((user.noShowCount || 0) >= 3) {
-      setErrorMsg("Account Restricted: You have 3 or more no-shows and are temporarily restricted from claiming new food.");
-      return;
-    }
-
-    // --- DAILY CLAIM LIMIT LOGIC ---
-    // In a real app, we'd fetch this from the database for the current day.
-    const myTodayClaims = MOCK_CLAIMS.filter(c => c.receiverId === user.id);
-    const totalMealsClaimedToday = myTodayClaims.reduce((acc, curr) => acc + curr.quantity, 0);
-
-    if (myTodayClaims.length >= 2) {
-      setErrorMsg("Daily Limit Reached: You have already made 2 claims today.");
-      return;
-    }
-
-    if (totalMealsClaimedToday + quantity > 5) {
-      setErrorMsg(`Daily Limit Reached: You can only claim up to 5 meals per day. You have already claimed ${totalMealsClaimedToday}.`);
-      return;
-    }
-    // -------------------------------
-
-    // Simulate claim
+    setSubmitting(true);
     setErrorMsg("");
-    setClaimed(true);
-    setTimeout(() => {
-      router.push("/dashboard");
-    }, 2000);
-  };
 
-  const requiresAllergyCheck = Boolean(listing.allergies);
-  const canClaim = !requiresAllergyCheck || allergyChecked;
+    try {
+      // Hardcode pickup to 1 hour from now for MVP
+      const pickupTime = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+      await createClaim(listing.id, user.id, quantity, pickupTime);
+      
+      setClaimed(true);
+      setTimeout(() => {
+        router.push("/dashboard");
+      }, 2000);
+    } catch (error: any) {
+      setErrorMsg(error.message || "Failed to claim food. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-neutral-bg p-4 sm:p-8">
@@ -149,6 +149,11 @@ export default function FoodDetailPage() {
                   <CheckCircle2 className="w-12 h-12 mb-3 text-green-600" />
                   <h3 className="text-xl font-bold">Claim Request Sent!</h3>
                   <p className="text-sm mt-2 text-center">Waiting for donor approval. Redirecting to dashboard...</p>
+                </div>
+              ) : user?.role === "donor" ? (
+                <div className="flex flex-col items-center justify-center p-6 bg-gray-50 rounded-xl text-gray-600">
+                  <h3 className="text-lg font-semibold">Registered as a Donor</h3>
+                  <p className="text-sm mt-2 text-center">Donors cannot claim food. Please log in with a receiver account if you wish to claim items.</p>
                 </div>
               ) : (
                 <div className="flex flex-col gap-4">

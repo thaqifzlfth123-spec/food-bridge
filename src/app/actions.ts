@@ -107,6 +107,56 @@ export async function getFoodListings(): Promise<FoodListing[]> {
   }));
 }
 
+export async function getListingById(id: string): Promise<FoodListing | null> {
+  const l = await prisma.foodlistings.findUnique({ where: { id } });
+  if (!l) return null;
+  
+  return {
+    id: l.id,
+    donorId: l.donor_id,
+    foodName: l.food_name,
+    category: l.category,
+    description: l.description,
+    quantityTotal: l.quant_total,
+    quantityAvailable: l.quant_avail,
+    pickupLocation: l.pickup_loc,
+    pickupDeadline: l.pickup_deadline.toISOString(),
+    expiryTime: l.expiry_time.toISOString(),
+    halal: l.isHalal,
+    vegetarian: l.isVegetarian,
+    allergies: l.allergies || "",
+    urgencyLevel: l.urgent_lvl,
+    status: l.status === "Partially_Claimed" ? "Partially Claimed" :
+            l.status === "Fully_Claimed" ? "Fully Claimed" : l.status,
+    imageUrl: l.image_url || undefined,
+    createdAt: l.created_at.toISOString(),
+  };
+}
+
+export async function getUserTodayClaims(userId: string): Promise<Claim[]> {
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+
+  const claims = await prisma.claims.findMany({
+    where: {
+      receiver_id: userId,
+      created_at: {
+        gte: startOfDay,
+      }
+    }
+  });
+
+  return claims.map(c => ({
+    id: c.id,
+    foodId: c.food_id,
+    receiverId: c.receiver_id,
+    quantity: c.quantity,
+    pickupTime: c.pickup_time.toISOString(),
+    status: c.status === "No_Show" ? "No-Show" : c.status,
+    createdAt: c.created_at.toISOString(),
+  }));
+}
+
 export async function getClaims(): Promise<Claim[]> {
   const claims = await prisma.claims.findMany({
     orderBy: { created_at: 'desc' }
@@ -125,6 +175,19 @@ export async function getClaims(): Promise<Claim[]> {
 
 export async function getUserProfile(email: string): Promise<User | null> {
   const user = await prisma.users.findUnique({ where: { email } });
+  if (!user) return null;
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    noShowCount: user.no_show_count,
+    isVerified: user.isVerified,
+  };
+}
+
+export async function getUserById(id: string): Promise<User | null> {
+  const user = await prisma.users.findUnique({ where: { id } });
   if (!user) return null;
   return {
     id: user.id,
@@ -228,6 +291,36 @@ export async function createListing(data: Omit<FoodListing, "id" | "createdAt" |
 }
 
 export async function createClaim(foodId: string, receiverId: string, quantity: number, pickupTime: string) {
+  // 1. Check User Penalties
+  const user = await prisma.users.findUnique({ where: { id: receiverId } });
+  if (!user) throw new Error("User not found");
+  if (user.no_show_count >= 3) {
+    throw new Error("Account Restricted: You have 3 or more no-shows and are temporarily restricted from claiming new food.");
+  }
+
+  // 2. Check Daily Limits
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+  const todayClaims = await prisma.claims.findMany({
+    where: { receiver_id: receiverId, created_at: { gte: startOfDay } }
+  });
+  
+  if (todayClaims.length >= 2) {
+    throw new Error("Daily Limit Reached: You have already made 2 claims today.");
+  }
+  const totalMealsClaimedToday = todayClaims.reduce((acc, curr) => acc + curr.quantity, 0);
+  if (totalMealsClaimedToday + quantity > 5) {
+    throw new Error(`Daily Limit Reached: You can only claim up to 5 meals per day. You have already claimed ${totalMealsClaimedToday}.`);
+  }
+
+  // 3. Check Listing Availability
+  const listing = await prisma.foodlistings.findUnique({ where: { id: foodId } });
+  if (!listing) throw new Error("Listing not found");
+  if (listing.quant_avail < quantity) {
+    throw new Error(`Only ${listing.quant_avail} packs available.`);
+  }
+
+  // 4. Create Claim and Deduct Inventory
   const id = "c" + Date.now();
   await prisma.claims.create({
     data: {
@@ -240,15 +333,21 @@ export async function createClaim(foodId: string, receiverId: string, quantity: 
     }
   });
 
-  // Deduct quantity from listing
+  const newAvail = listing.quant_avail - quantity;
+  let newStatus = listing.status;
+  if (newAvail === 0) newStatus = "Fully_Claimed";
+  else if (newAvail < listing.quant_total) newStatus = "Partially_Claimed";
+
   await prisma.foodlistings.update({
     where: { id: foodId },
     data: {
-      quant_avail: { decrement: quantity }
+      quant_avail: newAvail,
+      status: newStatus as any
     }
   });
 
   revalidatePath('/listings');
   revalidatePath('/dashboard');
+  revalidatePath(`/listings/${foodId}`);
   return { success: true, id };
 }
