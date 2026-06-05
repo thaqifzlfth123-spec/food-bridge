@@ -5,10 +5,10 @@ FoodBridge Campus is an AI-powered food rescue platform built specifically for u
 ## 🚀 Tech Stack
 - **Framework:** Next.js (App Router)
 - **Language:** TypeScript
+- **Database:** MySQL (XAMPP)
+- **ORM:** Prisma v5
 - **Styling:** Tailwind CSS
 - **Icons:** Lucide React
-- **Forms & Validation:** React Hook Form + Zod
-- **Utilities:** `qrcode.react` (for security verification)
 
 ## ✨ Key Features (A-Z)
 
@@ -23,11 +23,10 @@ Users can switch between three core roles upon login, each with a tailored exper
 - **Dietary Tags:** Support for Halal, Vegetarian, and specific allergy warnings.
 - **Urgency Scoring:** The system automatically calculates urgency (Low, Medium, High, Critical) based on the quantity of food and the remaining time until expiry.
 
-### 3. Claiming & Cart System
-- **My Pickups:** Receivers add food to their "Cart" (My Pickups). 
-- **Approval Flow:** Claims sit in a "Pending" state until the donor explicitly approves them.
-- **Daily Claim Limits:** To ensure fair distribution, receivers are strictly limited to **2 claims or 5 total meals per day**.
-- **Allergy Confirmation:** If a listing contains allergens, the receiver MUST check a mandatory confirmation box before the system allows them to claim it.
+### 3. Database-Enforced Claiming System
+- **Real-Time Inventory:** When a receiver claims food, the database immediately deducts the requested quantity from the listing.
+- **Strict Daily Limits:** Receivers are mathematically limited by the database to **2 claims per day** or **5 total meals per day**. Any request exceeding this is hard-blocked.
+- **Allergy Confirmation:** If a listing contains allergens, the receiver MUST check a mandatory confirmation box before claiming.
 
 ### 4. Security & Verification (QR Codes)
 - Once a claim is approved, the system generates a **Unique QR Code** containing the Claim ID on the receiver's dashboard.
@@ -36,32 +35,31 @@ Users can switch between three core roles upon login, each with a tailored exper
 
 ### 5. No-Show Penalty System
 - If a receiver fails to pick up their claimed food, donors can mark the claim as a **"No-Show"**.
-- Receivers receive warnings on their dashboard. If a receiver accumulates **3 No-Shows**, their account is temporarily restricted from claiming new food, preventing future food waste.
+- If a receiver accumulates **3 No-Shows**, the database actively restricts their account from claiming any new food, preventing future food waste.
 
-### 6. Donor Trust & Rewards
-- **Verified Badges:** Trusted donors (like official Campus Cafes) receive a blue "Verified Donor" checkmark badge on their listings to build confidence.
-- **Impact Dashboard & Certificates:** Donors see live metrics (Meals Saved, Waste Reduced). They can also generate a beautiful, shareable **Certificate of Impact** acknowledging their contributions.
+### 6. Search & Filtering
+- Users can instantly filter the live database feed using the Search Bar (searching by food name or description) and Category Dropdown.
 
-### 7. AI Integrations (Mocked for MVP)
-- The architecture is prepared for Gemini API integration for future features like:
-  - **Description Cleaner:** Formatting messy donor text into clean, appetizing descriptions.
-  - **Urgency Explainer:** Generating a one-sentence reason why an item is urgent.
-  - **Impact Summarizer:** Creating personalized thank-you messages.
+### 7. AI Integrations (Planned)
+- Future integrations will include Auto-Categorization (guessing dietary tags from text) and Intelligent Urgency Sorting (bringing expiring food to the top of the feed).
 
 ## 🛠️ Getting Started Locally
 
-1. **Clone the repository**
-2. **Install dependencies:**
+1. **Start XAMPP** (Ensure Apache and MySQL are running).
+2. **Clone the repository** and install dependencies:
    ```bash
    npm install
    ```
-3. **Run the development server:**
+3. **Set up the Database**
+   - Create a `.env` file in the root directory.
+   - Add your connection string: `DATABASE_URL="mysql://root:@localhost:3306/foodbridge"`
+   - Generate the database client and push the schema:
+     ```bash
+     npx prisma generate
+     npx prisma db push
+     ```
+4. **Run the development server:**
    ```bash
    npm run dev
    ```
-4. **Open [http://localhost:3000](http://localhost:3000)** in your browser to see the result.
-
-### Testing Accounts (Mock Data)
-- **Donor:** `cafe@campus.edu` (Auto-logs in as a Verified Donor)
-- **Receiver:** `aina@student.edu` (Auto-logs in as a Receiver)
-- **Volunteer:** `sarah@volunteer.org` (Auto-logs in as a Volunteer)
+5. **Open [http://localhost:3000](http://localhost:3000)** in your browser!
