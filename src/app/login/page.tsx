@@ -9,12 +9,17 @@ export default function LoginPage() {
   const router = useRouter();
   const { login } = useAuth();
 
-  const handleLogin = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const email = formData.get("email") as string;
-    login(email);
-    router.push("/dashboard");
+    const password = formData.get("password") as string;
+    const success = await login(email, password);
+    if (success) {
+      router.push("/dashboard");
+    } else {
+      alert("Login failed. Check your email or sign up.");
+    }
   };
 
   return (

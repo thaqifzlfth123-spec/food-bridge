@@ -8,15 +8,21 @@ import { useAuth } from "@/lib/auth-context";
 
 export default function SignupPage() {
   const router = useRouter();
-  const { login } = useAuth();
+  const { register } = useAuth();
   const [role, setRole] = useState("receiver");
 
-  const handleSignup = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const email = formData.get("email") as string;
-    login(email);
-    router.push("/dashboard");
+    const name = formData.get("name") as string;
+    const password = formData.get("password") as string;
+    const success = await register(name, email, role, password);
+    if (success) {
+      router.push("/dashboard");
+    } else {
+      alert("Signup failed. Email might already exist.");
+    }
   };
 
   return (

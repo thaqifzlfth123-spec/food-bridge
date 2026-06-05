@@ -28,7 +28,6 @@ type PostFoodValues = z.infer<typeof postFoodSchema>;
 export default function PostFoodPage() {
   const { user } = useAuth();
   const router = useRouter();
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const {
     register,

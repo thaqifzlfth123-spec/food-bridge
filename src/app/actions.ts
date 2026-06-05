@@ -139,6 +139,44 @@ export async function getUserProfile(email: string): Promise<User | null> {
 // ---------------------------------------------------------
 // MUTATIONS (Writes to XAMPP Database)
 // ---------------------------------------------------------
+// AUTHENTICATION
+// ---------------------------------------------------------
+export async function registerUser(name: string, email: string, role: string, passwordHash: string): Promise<User> {
+  const id = "u_" + Date.now();
+  const user = await prisma.users.create({
+    data: {
+      id,
+      name,
+      email,
+      role: role as any,
+      password_hash: passwordHash, // In a real app, hash this properly
+    }
+  });
+  
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role as any,
+    noShowCount: user.no_show_count,
+    isVerified: user.isVerified,
+  };
+}
+
+export async function loginUser(email: string, passwordHash: string): Promise<User | null> {
+  // In a real app, verify passwordHash
+  const user = await prisma.users.findUnique({ where: { email } });
+  if (!user) return null;
+  
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role as any,
+    noShowCount: user.no_show_count,
+    isVerified: user.isVerified,
+  };
+}
 export async function updateClaimStatus(claimId: string, newStatus: Claim["status"]) {
   const dbStatus = newStatus === "No-Show" ? "No_Show" : newStatus;
   

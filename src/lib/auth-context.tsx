@@ -3,9 +3,12 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { User, MOCK_USERS } from "./mock-data";
 
+import { loginUser, registerUser } from "@/app/actions";
+
 interface AuthContextType {
   user: User | null;
-  login: (email: string) => void;
+  login: (email: string, password?: string) => Promise<boolean>;
+  register: (name: string, email: string, role: string, password?: string) => Promise<boolean>;
   logout: () => void;
 }
 
@@ -15,28 +18,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
-    // Check local storage for mock session
     const storedUser = localStorage.getItem("mock_user");
     if (storedUser) {
       setUser(JSON.parse(storedUser));
     }
   }, []);
 
-  const login = (email: string) => {
-    const foundUser = MOCK_USERS.find(u => u.email === email);
+  const login = async (email: string, password?: string) => {
+    // Try mock first
+    let foundUser = MOCK_USERS.find(u => u.email === email);
+    
+    // Try database
+    if (!foundUser) {
+      const dbUser = await loginUser(email, password || "hashed_pw");
+      if (dbUser) foundUser = dbUser;
+    }
+
     if (foundUser) {
       setUser(foundUser);
       localStorage.setItem("mock_user", JSON.stringify(foundUser));
-    } else {
-      // Create a mock user for the demo
-      const newUser: User = {
-        id: `u_${Date.now()}`,
-        name: email.split("@")[0],
-        email: email,
-        role: email.includes("cafe") ? "donor" : "receiver",
-      };
+      return true;
+    }
+    return false;
+  };
+
+  const register = async (name: string, email: string, role: string, password?: string) => {
+    try {
+      const newUser = await registerUser(name, email, role, password || "hashed_pw");
       setUser(newUser);
       localStorage.setItem("mock_user", JSON.stringify(newUser));
+      return true;
+    } catch (e) {
+      console.error(e);
+      return false;
     }
   };
 
@@ -46,7 +60,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout }}>
+    <AuthContext.Provider value={{ user, login, register, logout }}>
       {children}
     </AuthContext.Provider>
   );
