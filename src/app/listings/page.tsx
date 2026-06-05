@@ -1,13 +1,27 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { MOCK_LISTINGS, MOCK_USERS } from "@/lib/mock-data";
+import { MOCK_USERS } from "@/lib/mock-data";
 import { calculateUrgency } from "@/lib/urgency";
 import { Clock, MapPin, ArrowLeft, BadgeCheck } from "lucide-react";
+import { getFoodListings } from "@/app/actions";
+import { FoodListing } from "@/lib/mock-data";
 import Link from "next/link";
 
 export default function ListingsPage() {
   const { user } = useAuth();
+  const [searchTerm, setSearchTerm] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("All");
+  const [listings, setListings] = useState<FoodListing[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getFoodListings().then(l => {
+      setListings(l);
+      setLoading(false);
+    });
+  }, []);
 
   const getUrgencyColor = (urgency: string) => {
     switch (urgency) {

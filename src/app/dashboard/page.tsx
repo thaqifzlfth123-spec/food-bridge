@@ -5,42 +5,54 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { PlusCircle, List, ArrowRight, Check, X, Utensils, HeartHandshake, Leaf, Clock, MapPin, QrCode, AlertTriangle, Award } from "lucide-react";
-import { MOCK_CLAIMS, MOCK_LISTINGS } from "@/lib/mock-data";
+import { getClaims, getFoodListings, updateClaimStatus } from "@/app/actions";
+import { Claim, FoodListing } from "@/lib/mock-data";
 import { QRCodeSVG } from "qrcode.react";
 
 export default function DashboardPage() {
   const { user, logout } = useAuth();
   const router = useRouter();
-  const [claims, setClaims] = useState(MOCK_CLAIMS);
+  const [claims, setClaims] = useState<Claim[]>([]);
+  const [listings, setListings] = useState<FoodListing[]>([]);
   const [showCertificate, setShowCertificate] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!user) {
       router.push("/login");
+    } else {
+      Promise.all([getClaims(), getFoodListings()]).then(([c, l]) => {
+        setClaims(c);
+        setListings(l);
+        setLoading(false);
+      });
     }
   }, [user, router]);
 
-  if (!user) return null;
+  if (!user || loading) return <div className="min-h-screen flex items-center justify-center">Loading dashboard...</div>;
 
   const pendingClaims = claims.filter(c => c.status === "Pending");
   const myClaims = claims.filter(c => c.receiverId === user.id);
 
-  const handleApprove = (id: string) => {
+  const handleApprove = async (id: string) => {
     setClaims(claims.map(c => c.id === id ? { ...c, status: "Approved" } : c));
+    await updateClaimStatus(id, "Approved");
   };
 
-  const handleReject = (id: string) => {
+  const handleReject = async (id: string) => {
     setClaims(claims.map(c => c.id === id ? { ...c, status: "Rejected" } : c));
+    await updateClaimStatus(id, "Rejected");
   };
 
-  const handleMarkCollected = (id: string) => {
+  const handleMarkCollected = async (id: string) => {
     setClaims(claims.map(c => c.id === id ? { ...c, status: "Collected" } : c));
+    await updateClaimStatus(id, "Collected");
   };
 
-  const handleNoShow = (id: string) => {
-    // In a real app, we would update the backend to increment user's noShowCount
+  const handleNoShow = async (id: string) => {
     setClaims(claims.map(c => c.id === id ? { ...c, status: "No-Show" } : c));
     alert("Receiver marked as No-Show. A penalty has been recorded on their account.");
+    await updateClaimStatus(id, "No-Show");
   };
 
   return (
@@ -156,7 +168,7 @@ export default function DashboardPage() {
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {myClaims.map(claim => {
-                  const food = MOCK_LISTINGS.find(l => l.id === claim.foodId);
+                  const food = listings.find(l => l.id === claim.foodId);
                   if (!food) return null;
 
                   return (
@@ -220,7 +232,7 @@ export default function DashboardPage() {
             ) : (
               <div className="space-y-4 mb-8">
                 {pendingClaims.map(claim => {
-                  const food = MOCK_LISTINGS.find(l => l.id === claim.foodId);
+                  const food = listings.find(l => l.id === claim.foodId);
                   return (
                     <div key={claim.id} className="flex flex-col sm:flex-row items-center justify-between p-4 border rounded-lg bg-gray-50 gap-4">
                       <div>
@@ -248,7 +260,7 @@ export default function DashboardPage() {
                 <h3 className="font-bold text-gray-700 mb-4 text-sm uppercase tracking-wide">Approved Pickups (Verify QR)</h3>
                 <div className="space-y-3">
                   {claims.filter(c => c.status === "Approved").map(claim => {
-                    const food = MOCK_LISTINGS.find(l => l.id === claim.foodId);
+                    const food = listings.find(l => l.id === claim.foodId);
                     return (
                       <div key={claim.id} className="flex flex-col sm:flex-row justify-between items-center p-4 border border-green-200 bg-green-50 rounded-lg gap-4">
                         <div className="flex-1">

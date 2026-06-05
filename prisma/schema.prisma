@@ -1,0 +1,93 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model claims {
+  id           String        @id @db.VarChar(50)
+  food_id      String        @db.VarChar(50)
+  receiver_id  String        @db.VarChar(50)
+  quantity     Int
+  pickup_time  DateTime      @db.DateTime(0)
+  status       claims_status @default(Pending)
+  created_at   DateTime      @default(now()) @db.Timestamp(0)
+  foodlistings foodlistings  @relation(fields: [food_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "claims_ibfk_1")
+  users        users         @relation(fields: [receiver_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "claims_ibfk_2")
+
+  @@index([food_id], map: "food_id")
+  @@index([receiver_id], map: "receiver_id")
+}
+
+model foodlistings {
+  id              String                  @id @db.VarChar(50)
+  donor_id        String                  @db.VarChar(50)
+  food_name       String                  @db.VarChar(150)
+  category        String                  @db.VarChar(50)
+  description     String                  @db.Text
+  quant_total     Int
+  quant_avail     Int
+  pickup_loc      String                  @db.VarChar(255)
+  pickup_deadline DateTime                @db.DateTime(0)
+  isHalal         Boolean                 @default(false)
+  isVegetarian    Boolean                 @default(false)
+  allergies       String?                 @db.VarChar(255)
+  urgent_lvl      foodlistings_urgent_lvl @default(Low)
+  status          foodlistings_status     @default(Available)
+  image_url       String?                 @db.VarChar(255)
+  created_at      DateTime                @default(now()) @db.Timestamp(0)
+  expiry_time     DateTime                @db.DateTime(0)
+  claims          claims[]
+  users           users                   @relation(fields: [donor_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "foodlistings_ibfk_1")
+
+  @@index([donor_id], map: "donor_id")
+}
+
+model users {
+  id            String         @id @db.VarChar(50)
+  name          String         @db.VarChar(100)
+  email         String         @unique(map: "email") @db.VarChar(100)
+  password_hash String         @db.VarChar(255)
+  role          users_role
+  no_show_count Int            @default(0)
+  isVerified    Boolean        @default(false)
+  created_at    DateTime       @default(now()) @db.Timestamp(0)
+  claims        claims[]
+  foodlistings  foodlistings[]
+}
+
+enum users_role {
+  donor
+  receiver
+  volunteer
+  admin
+}
+
+enum claims_status {
+  Pending
+  Approved
+  Rejected
+  Collected
+  Cancelled
+  No_Show   @map("No-Show")
+}
+
+enum foodlistings_urgent_lvl {
+  Low
+  Medium
+  High
+  Critical
+  Expired
+}
+
+enum foodlistings_status {
+  Available
+  Partially_Claimed @map("Partially Claimed")
+  Fully_Claimed     @map("Fully Claimed")
+  Collected
+  Expired
+  Cancelled
+}

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { createListing } from "@/app/actions";
 import { Leaf, ArrowLeft, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
@@ -32,7 +33,7 @@ export default function PostFoodPage() {
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isSubmitting },
   } = useForm<PostFoodValues>({
     resolver: zodResolver(postFoodSchema),
     defaultValues: {
@@ -42,19 +43,30 @@ export default function PostFoodPage() {
   });
 
   if (!user || (user.role !== "donor" && user.role !== "volunteer")) {
-    return <div className="p-8 text-center text-red-500">Access Denied. Donors and Volunteers only.</div>;
+    router.push("/dashboard");
+    return null;
   }
 
   const onSubmit = async (data: PostFoodValues) => {
-    setIsSubmitting(true);
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // In a real app, we would send this to Supabase
-    console.log("Mock saved data:", data);
-    
-    setIsSubmitting(false);
-    router.push("/dashboard?success=true");
+    try {
+      await createListing({
+        donorId: user.id,
+        foodName: data.foodName,
+        category: data.category,
+        description: data.description || "",
+        quantityTotal: data.quantity,
+        pickupLocation: data.pickupLocation,
+        pickupDeadline: data.pickupDeadline,
+        expiryTime: data.expiryTime,
+        halal: data.halal,
+        vegetarian: data.vegetarian,
+        allergies: data.allergies || "",
+      });
+      router.push("/dashboard?success=true");
+    } catch (error) {
+      console.error("Failed to post food:", error);
+      alert("Failed to post food. Please try again.");
+    }
   };
 
   return (
