@@ -212,7 +212,7 @@ export async function getUserById(id: string): Promise<User | null> {
 export async function registerUser(name: string, email: string, role: string, passwordHash: string) {
   const result = registerSchema.safeParse({ name, email, role, password: passwordHash });
   if (!result.success) {
-    return { success: false, error: (result.error as any).errors[0].message };
+    return { success: false, error: result.error.issues[0].message };
   }
   
   const existingUser = await prisma.users.findUnique({ where: { email } });
@@ -285,7 +285,7 @@ export async function createListing(data: any) {
   if (!session?.user) return { success: false, error: "Unauthorized" };
 
   const result = createListingSchema.safeParse(data);
-  if (!result.success) return { success: false, error: (result.error as any).errors[0].message };
+  if (!result.success) return { success: false, error: result.error.issues[0].message };
 
   const parsed = result.data;
   const listing = await prisma.foodlistings.create({
@@ -319,7 +319,7 @@ export async function createClaim(foodId: string, quantity: number, pickupTime: 
   const receiverId = (session.user as any).id;
 
   const result = createClaimSchema.safeParse({ foodId, quantity, pickupTime });
-  if (!result.success) return { success: false, error: (result.error as any).errors[0].message };
+  if (!result.success) return { success: false, error: result.error.issues[0].message };
 
   // 1. Check User Penalties
   const user = await prisma.users.findUnique({ where: { id: receiverId } });
