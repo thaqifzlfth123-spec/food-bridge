@@ -7,6 +7,7 @@ import bcrypt from "bcryptjs";
 import { registerSchema, createListingSchema, createClaimSchema, updateClaimStatusSchema } from "@/lib/schemas";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { randomUUID } from "crypto";
 
 // ---------------------------------------------------------
 // DATABASE SEEDING (One-time use to populate your local DB)
@@ -223,6 +224,7 @@ export async function registerUser(name: string, email: string, role: string, pa
   
   const user = await prisma.users.create({
     data: {
+      id: randomUUID(),
       name: result.data.name,
       email: result.data.email,
       role: result.data.role as any,
@@ -288,6 +290,7 @@ export async function createListing(data: any) {
   const parsed = result.data;
   const listing = await prisma.foodlistings.create({
     data: {
+      id: randomUUID(),
       donor_id: (session.user as any).id,
       food_name: parsed.foodName,
       category: parsed.category,
@@ -350,6 +353,7 @@ export async function createClaim(foodId: string, quantity: number, pickupTime: 
   // 4. Create Claim and Deduct Inventory
   const claim = await prisma.claims.create({
     data: {
+      id: randomUUID(),
       food_id: foodId,
       receiver_id: receiverId,
       quantity,
