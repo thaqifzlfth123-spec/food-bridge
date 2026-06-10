@@ -20,7 +20,7 @@ export function calculateUrgency(listing: FoodListing): UrgencyLevel {
     baseLevel = "Medium";
   }
 
-  if (baseLevel === "Expired" || baseLevel === "Critical") return baseLevel;
+  if (baseLevel === "Critical") return baseLevel;
 
   let bump = false;
   if (listing.quantityAvailable > 20) bump = true;

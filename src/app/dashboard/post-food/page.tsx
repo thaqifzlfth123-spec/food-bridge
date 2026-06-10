@@ -1,6 +1,6 @@
 "use client";
 
-import { useAuth } from "@/lib/auth-context";
+import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -13,12 +13,12 @@ import { useState } from "react";
 const postFoodSchema = z.object({
   foodName: z.string().min(3, "Food name is required"),
   category: z.string().min(1, "Category is required"),
-  quantity: z.coerce.number().min(1, "Quantity must be at least 1"),
+  quantity: z.number().min(1, "Quantity must be at least 1"),
   pickupLocation: z.string().min(3, "Pickup location is required"),
   pickupDeadline: z.string().min(1, "Pickup deadline is required"),
   expiryTime: z.string().min(1, "Expiry time is required"),
-  halal: z.boolean().default(false),
-  vegetarian: z.boolean().default(false),
+  halal: z.boolean(),
+  vegetarian: z.boolean(),
   allergies: z.string().optional(),
   description: z.string().optional(),
 });
@@ -26,7 +26,8 @@ const postFoodSchema = z.object({
 type PostFoodValues = z.infer<typeof postFoodSchema>;
 
 export default function PostFoodPage() {
-  const { user } = useAuth();
+  const { data: session, status } = useSession();
+  const user = session?.user as any;
   const router = useRouter();
 
   const {
@@ -41,6 +42,8 @@ export default function PostFoodPage() {
     }
   });
 
+  if (status === "loading") return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+
   if (!user || (user.role !== "donor" && user.role !== "volunteer")) {
     router.push("/dashboard");
     return null;
@@ -48,20 +51,35 @@ export default function PostFoodPage() {
 
   const onSubmit = async (data: PostFoodValues) => {
     try {
-      await createListing({
-        donorId: user.id,
+      const now = new Date();
+      // create ISO strings from time inputs (assuming today for simplicity since inputs are only time)
+      const pdDate = new Date();
+      const [pdH, pdM] = data.pickupDeadline.split(":");
+      pdDate.setHours(parseInt(pdH, 10), parseInt(pdM, 10), 0);
+      
+      const exDate = new Date();
+      const [exH, exM] = data.expiryTime.split(":");
+      exDate.setHours(parseInt(exH, 10), parseInt(exM, 10), 0);
+
+      const result = await createListing({
+        donorId: user.id, // We keep this for now, even though server action will use session user
         foodName: data.foodName,
         category: data.category,
         description: data.description || "",
         quantityTotal: data.quantity,
         pickupLocation: data.pickupLocation,
-        pickupDeadline: data.pickupDeadline,
-        expiryTime: data.expiryTime,
+        pickupDeadline: pdDate.toISOString(),
+        expiryTime: exDate.toISOString(),
         halal: data.halal,
         vegetarian: data.vegetarian,
         allergies: data.allergies || "",
+        urgencyLevel: "Low", // Defaulting to low for now, server needs this
       });
-      router.push("/dashboard?success=true");
+      if (result.success) {
+        router.push("/dashboard?success=true");
+      } else {
+        alert("Failed to post food: " + result.error);
+      }
     } catch (error) {
       console.error("Failed to post food:", error);
       alert("Failed to post food. Please try again.");
@@ -113,7 +131,7 @@ export default function PostFoodPage() {
               <label className="block text-sm font-medium text-gray-700">Quantity (Packs/Portions)</label>
               <input
                 type="number"
-                {...register("quantity")}
+                {...register("quantity", { valueAsNumber: true })}
                 className="mt-1 block w-full rounded-md border-gray-300 border px-3 py-2 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
               />
               {errors.quantity && <p className="mt-1 text-sm text-red-600">{errors.quantity.message}</p>}

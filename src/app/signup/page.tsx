@@ -4,11 +4,11 @@ import Link from "next/link";
 import { Leaf } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { useAuth } from "@/lib/auth-context";
+import { signIn } from "next-auth/react";
+import { registerUser } from "@/app/actions";
 
 export default function SignupPage() {
   const router = useRouter();
-  const { register } = useAuth();
   const [role, setRole] = useState("receiver");
 
   const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -17,11 +17,21 @@ export default function SignupPage() {
     const email = formData.get("email") as string;
     const name = formData.get("name") as string;
     const password = formData.get("password") as string;
-    const success = await register(name, email, role, password);
-    if (success) {
-      router.push("/dashboard");
+    
+    const result = await registerUser(name, email, role, password);
+    if (result.success) {
+      const signInResult = await signIn("credentials", {
+        redirect: false,
+        email,
+        password,
+      });
+      if (signInResult?.ok) {
+        router.push("/dashboard");
+      } else {
+        router.push("/login");
+      }
     } else {
-      alert("Signup failed. Email might already exist.");
+      alert("Signup failed: " + (result.error || "Unknown error"));
     }
   };
 

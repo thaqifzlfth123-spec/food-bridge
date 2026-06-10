@@ -1,35 +1,41 @@
 "use client";
 
-import { useAuth } from "@/lib/auth-context";
+import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { PlusCircle, List, ArrowRight, Check, X, Utensils, HeartHandshake, Leaf, Clock, MapPin, QrCode, AlertTriangle, Award } from "lucide-react";
-import { getClaims, getFoodListings, updateClaimStatus } from "@/app/actions";
+import { getClaims, getFoodListings, updateClaimStatus, getUserById } from "@/app/actions";
 import { Claim, FoodListing } from "@/lib/mock-data";
 import { QRCodeSVG } from "qrcode.react";
 
 export default function DashboardPage() {
-  const { user, logout } = useAuth();
+  const { data: session, status } = useSession();
+  const authUser = session?.user as any;
   const router = useRouter();
   const [claims, setClaims] = useState<Claim[]>([]);
   const [listings, setListings] = useState<FoodListing[]>([]);
   const [showCertificate, setShowCertificate] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  const [fullUser, setFullUser] = useState<any>(null);
+
   useEffect(() => {
-    if (!user) {
+    if (status === "unauthenticated") {
       router.push("/login");
-    } else {
-      Promise.all([getClaims(), getFoodListings()]).then(([c, l]) => {
+    } else if (status === "authenticated" && authUser?.id) {
+      Promise.all([getClaims(), getFoodListings(), getUserById(authUser.id)]).then(([c, l, u]) => {
         setClaims(c);
         setListings(l);
+        setFullUser(u);
         setLoading(false);
       });
     }
-  }, [user, router]);
+  }, [status, authUser, router]);
 
-  if (!user || loading) return <div className="min-h-screen flex items-center justify-center">Loading dashboard...</div>;
+  if (status === "loading" || loading || !fullUser) return <div className="min-h-screen flex items-center justify-center">Loading dashboard...</div>;
+
+  const user = fullUser;
 
   const pendingClaims = claims.filter(c => c.status === "Pending");
   const myClaims = claims.filter(c => c.receiverId === user.id);
@@ -68,8 +74,7 @@ export default function DashboardPage() {
             </span>
             <button
               onClick={() => {
-                logout();
-                router.push("/");
+                signOut({ callbackUrl: '/' });
               }}
               className="text-sm font-medium text-gray-500 hover:text-gray-700"
             >

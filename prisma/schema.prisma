@@ -8,7 +8,7 @@ datasource db {
 }
 
 model claims {
-  id           String        @id @db.VarChar(50)
+  id           String        @id @default(cuid()) @db.VarChar(50)
   food_id      String        @db.VarChar(50)
   receiver_id  String        @db.VarChar(50)
   quantity     Int
@@ -23,7 +23,7 @@ model claims {
 }
 
 model foodlistings {
-  id              String                  @id @db.VarChar(50)
+  id              String                  @id @default(cuid()) @db.VarChar(50)
   donor_id        String                  @db.VarChar(50)
   food_name       String                  @db.VarChar(150)
   category        String                  @db.VarChar(50)
@@ -47,7 +47,7 @@ model foodlistings {
 }
 
 model users {
-  id            String         @id @db.VarChar(50)
+  id            String         @id @default(cuid()) @db.VarChar(50)
   name          String         @db.VarChar(100)
   email         String         @unique(map: "email") @db.VarChar(100)
   password_hash String         @db.VarChar(255)

@@ -1,6 +1,6 @@
 "use client";
 
-import { useAuth } from "@/lib/auth-context";
+import { useSession } from "next-auth/react";
 import { calculateUrgency } from "@/lib/urgency";
 import { ArrowLeft, Clock, MapPin, ShieldAlert, CheckCircle2, BadgeCheck, Loader2 } from "lucide-react";
 import Link from "next/link";
@@ -11,7 +11,8 @@ import { FoodListing, User } from "@/lib/mock-data";
 
 export default function FoodDetailPage() {
   const { id } = useParams();
-  const { user } = useAuth();
+  const { data: session } = useSession();
+  const user = session?.user as any;
   const router = useRouter();
   const [quantity, setQuantity] = useState(1);
   const [claimed, setClaimed] = useState(false);
@@ -52,7 +53,11 @@ export default function FoodDetailPage() {
     try {
       // Hardcode pickup to 1 hour from now for MVP
       const pickupTime = new Date(Date.now() + 60 * 60 * 1000).toISOString();
-      await createClaim(listing.id, user.id, quantity, pickupTime);
+      const result = await createClaim(listing.id, quantity, pickupTime);
+      
+      if (!result.success) {
+        throw new Error(result.error);
+      }
       
       setClaimed(true);
       setTimeout(() => {

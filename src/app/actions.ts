@@ -3,6 +3,10 @@
 import prisma from "@/lib/db";
 import { FoodListing, Claim, User, MOCK_USERS, MOCK_LISTINGS, MOCK_CLAIMS } from "@/lib/mock-data";
 import { revalidatePath } from "next/cache";
+import bcrypt from "bcryptjs";
+import { registerSchema, createListingSchema, createClaimSchema, updateClaimStatusSchema } from "@/lib/schemas";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 
 // ---------------------------------------------------------
 // DATABASE SEEDING (One-time use to populate your local DB)
@@ -204,25 +208,36 @@ export async function getUserById(id: string): Promise<User | null> {
 // ---------------------------------------------------------
 // AUTHENTICATION
 // ---------------------------------------------------------
-export async function registerUser(name: string, email: string, role: string, passwordHash: string): Promise<User> {
-  const id = "u_" + Date.now();
+export async function registerUser(name: string, email: string, role: string, passwordHash: string) {
+  const result = registerSchema.safeParse({ name, email, role, password: passwordHash });
+  if (!result.success) {
+    return { success: false, error: (result.error as any).errors[0].message };
+  }
+  
+  const existingUser = await prisma.users.findUnique({ where: { email } });
+  if (existingUser) {
+    return { success: false, error: "Email already registered" };
+  }
+
+  const hashed = await bcrypt.hash(passwordHash, 10);
+  
   const user = await prisma.users.create({
     data: {
-      id,
-      name,
-      email,
-      role: role as any,
-      password_hash: passwordHash, // In a real app, hash this properly
+      name: result.data.name,
+      email: result.data.email,
+      role: result.data.role as any,
+      password_hash: hashed,
     }
   });
   
   return {
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    role: user.role as any,
-    noShowCount: user.no_show_count,
-    isVerified: user.isVerified,
+    success: true,
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+    }
   };
 }
 
@@ -263,39 +278,51 @@ export async function updateClaimStatus(claimId: string, newStatus: Claim["statu
   return { success: true };
 }
 
-export async function createListing(data: Omit<FoodListing, "id" | "createdAt" | "status" | "quantityAvailable">) {
-  const id = "f" + Date.now();
-  await prisma.foodlistings.create({
+export async function createListing(data: any) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) return { success: false, error: "Unauthorized" };
+
+  const result = createListingSchema.safeParse(data);
+  if (!result.success) return { success: false, error: (result.error as any).errors[0].message };
+
+  const parsed = result.data;
+  const listing = await prisma.foodlistings.create({
     data: {
-      id,
-      donor_id: data.donorId,
-      food_name: data.foodName,
-      category: data.category,
-      description: data.description,
-      quant_total: data.quantityTotal,
-      quant_avail: data.quantityTotal,
-      pickup_loc: data.pickupLocation,
-      pickup_deadline: new Date(data.pickupDeadline),
-      expiry_time: new Date(data.expiryTime),
-      isHalal: data.halal,
-      isVegetarian: data.vegetarian,
-      allergies: data.allergies,
-      urgent_lvl: data.urgencyLevel,
+      donor_id: (session.user as any).id,
+      food_name: parsed.foodName,
+      category: parsed.category,
+      description: parsed.description,
+      quant_total: parsed.quantityTotal,
+      quant_avail: parsed.quantityTotal,
+      pickup_loc: parsed.pickupLocation,
+      pickup_deadline: new Date(parsed.pickupDeadline),
+      expiry_time: new Date(parsed.expiryTime),
+      isHalal: parsed.halal,
+      isVegetarian: parsed.vegetarian,
+      allergies: parsed.allergies,
+      urgent_lvl: parsed.urgencyLevel as any,
       status: "Available",
-      image_url: data.imageUrl,
+      image_url: parsed.imageUrl,
     }
   });
   revalidatePath('/listings');
   revalidatePath('/dashboard');
-  return { success: true, id };
+  return { success: true, id: listing.id };
 }
 
-export async function createClaim(foodId: string, receiverId: string, quantity: number, pickupTime: string) {
+export async function createClaim(foodId: string, quantity: number, pickupTime: string) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) return { success: false, error: "Unauthorized" };
+  const receiverId = (session.user as any).id;
+
+  const result = createClaimSchema.safeParse({ foodId, quantity, pickupTime });
+  if (!result.success) return { success: false, error: (result.error as any).errors[0].message };
+
   // 1. Check User Penalties
   const user = await prisma.users.findUnique({ where: { id: receiverId } });
-  if (!user) throw new Error("User not found");
+  if (!user) return { success: false, error: "User not found" };
   if (user.no_show_count >= 3) {
-    throw new Error("Account Restricted: You have 3 or more no-shows and are temporarily restricted from claiming new food.");
+    return { success: false, error: "Account Restricted: You have 3 or more no-shows." };
   }
 
   // 2. Check Daily Limits
@@ -306,25 +333,23 @@ export async function createClaim(foodId: string, receiverId: string, quantity: 
   });
   
   if (todayClaims.length >= 2) {
-    throw new Error("Daily Limit Reached: You have already made 2 claims today.");
+    return { success: false, error: "Daily Limit Reached: You have already made 2 claims today." };
   }
   const totalMealsClaimedToday = todayClaims.reduce((acc, curr) => acc + curr.quantity, 0);
   if (totalMealsClaimedToday + quantity > 5) {
-    throw new Error(`Daily Limit Reached: You can only claim up to 5 meals per day. You have already claimed ${totalMealsClaimedToday}.`);
+    return { success: false, error: `Daily Limit Reached: You can only claim up to 5 meals per day.` };
   }
 
   // 3. Check Listing Availability
   const listing = await prisma.foodlistings.findUnique({ where: { id: foodId } });
-  if (!listing) throw new Error("Listing not found");
+  if (!listing) return { success: false, error: "Listing not found" };
   if (listing.quant_avail < quantity) {
-    throw new Error(`Only ${listing.quant_avail} packs available.`);
+    return { success: false, error: `Only ${listing.quant_avail} packs available.` };
   }
 
   // 4. Create Claim and Deduct Inventory
-  const id = "c" + Date.now();
-  await prisma.claims.create({
+  const claim = await prisma.claims.create({
     data: {
-      id,
       food_id: foodId,
       receiver_id: receiverId,
       quantity,
@@ -349,5 +374,5 @@ export async function createClaim(foodId: string, receiverId: string, quantity: 
   revalidatePath('/listings');
   revalidatePath('/dashboard');
   revalidatePath(`/listings/${foodId}`);
-  return { success: true, id };
+  return { success: true, id: claim.id };
 }

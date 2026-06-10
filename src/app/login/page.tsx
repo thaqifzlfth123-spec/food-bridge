@@ -3,19 +3,24 @@
 import Link from "next/link";
 import { Leaf } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/lib/auth-context";
+import { signIn } from "next-auth/react";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login } = useAuth();
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const email = formData.get("email") as string;
     const password = formData.get("password") as string;
-    const success = await login(email, password);
-    if (success) {
+    
+    const result = await signIn("credentials", {
+      redirect: false,
+      email,
+      password,
+    });
+    
+    if (result?.ok) {
       router.push("/dashboard");
     } else {
       alert("Login failed. Check your email or sign up.");

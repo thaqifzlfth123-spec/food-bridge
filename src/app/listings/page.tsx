@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useAuth } from "@/lib/auth-context";
+import { useSession } from "next-auth/react";
 import { MOCK_USERS } from "@/lib/mock-data";
 import { calculateUrgency } from "@/lib/urgency";
 import { Clock, MapPin, ArrowLeft, BadgeCheck } from "lucide-react";
@@ -10,7 +10,8 @@ import { FoodListing } from "@/lib/mock-data";
 import Link from "next/link";
 
 export default function ListingsPage() {
-  const { user } = useAuth();
+  const { data: session } = useSession();
+  const user = session?.user as any;
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("All");
   const [listings, setListings] = useState<FoodListing[]>([]);
@@ -30,13 +31,23 @@ export default function ListingsPage() {
     
     const matchesCategory = categoryFilter === "All" || listing.category === categoryFilter;
     
-    // Hide Fully Claimed and Expired by default
-    const isAvailable = listing.status !== "Fully Claimed" && listing.status !== "Expired" && listing.status !== "No-Show";
+    // Hide Collected and Cancelled by default
+    const isAvailable = listing.status === "Available" || listing.status === "Partially Claimed";
 
     return matchesSearch && matchesCategory && isAvailable;
   });
 
   if (loading) return <div className="min-h-screen flex items-center justify-center">Loading listings...</div>;
+
+  const getUrgencyColor = (urgency: string) => {
+    switch (urgency) {
+      case "Critical": return "bg-red-100 text-red-800 border-red-200";
+      case "High": return "bg-orange-100 text-orange-800 border-orange-200";
+      case "Medium": return "bg-yellow-100 text-yellow-800 border-yellow-200";
+      case "Low": return "bg-green-100 text-green-800 border-green-200";
+      default: return "bg-gray-100 text-gray-800 border-gray-200";
+    }
+  };
 
   return (
     <div className="min-h-screen bg-neutral-bg p-4 sm:p-8">
